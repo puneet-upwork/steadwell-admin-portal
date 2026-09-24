@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply antialiased text-ink;
+  }
+
+  body {
+    @apply min-h-screen bg-cream font-sans;
+  }
+}
+
+@layer components {
+  .field {
+    @apply mt-1.5 block w-full rounded-lg border border-sand bg-white px-3 py-2.5 text-[15px] text-ink shadow-sm outline-none transition placeholder:text-ink-muted/50 focus:border-sage focus:ring-2 focus:ring-sage/20;
+  }
+
+  .btn-primary {
+    @apply inline-flex w-full items-center justify-center rounded-lg bg-sage px-3 py-2.5 text-[15px] font-semibold text-white shadow-sm transition hover:bg-sage-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage disabled:cursor-not-allowed disabled:opacity-60;
+  }
+}
