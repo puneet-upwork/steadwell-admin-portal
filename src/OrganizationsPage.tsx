@@ -2,7 +2,7 @@ import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { listOrganizations, softDeleteOrganization, type Organization } from "./api";
-import { CATEGORIES, StatusPill, categoryLabel, seatBandLabel } from "./ui";
+import { CATEGORIES, ConfirmDialog, StatusPill, categoryLabel, seatBandLabel } from "./ui";
 
 export function OrganizationsPage() {
   const navigate = useNavigate();
@@ -13,6 +13,7 @@ export function OrganizationsPage() {
   const [status, setStatus] = useState("");
   const [category, setCategory] = useState("");
   const [busyId, setBusyId] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<Organization | null>(null);
 
   async function refresh(nextQ = q, nextStatus = status, nextCategory = category) {
     setError("");
@@ -85,13 +86,19 @@ export function OrganizationsPage() {
   }
 
   async function onDelete(org: Organization) {
-    if (!window.confirm(`Soft delete “${org.name}”? It leaves the listing but stays in the database.`)) {
+    setPendingDelete(org);
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) {
       return;
     }
+    const org = pendingDelete;
     setBusyId(org.id);
     setError("");
     try {
       await softDeleteOrganization(org.id);
+      setPendingDelete(null);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Delete failed");
@@ -188,16 +195,20 @@ export function OrganizationsPage() {
                 <th className="px-5 py-3">Contract</th>
                 <th className="px-5 py-3">Users</th>
                 <th className="px-5 py-3">Status</th>
-                <th className="px-5 py-3 text-right">Actions</th>
+                <th className="w-14 px-3 py-3">
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>
               {orgs.map((org) => (
-                <tr key={org.id} className="border-b border-sand/70 last:border-0">
+                <tr
+                  key={org.id}
+                  className="cursor-pointer border-b border-sand/70 last:border-0 hover:bg-cream/70"
+                  onClick={() => navigate(`/organizations/${org.id}`)}
+                >
                   <td className="px-5 py-4">
-                    <Link className="font-medium text-ink hover:text-sage" to={`/organizations/${org.id}`}>
-                      {org.name}
-                    </Link>
+                    <span className="font-medium text-ink">{org.name}</span>
                     {org.legal_name ? (
                       <p className="mt-0.5 text-xs text-ink-muted">{org.legal_name}</p>
                     ) : null}
@@ -208,24 +219,20 @@ export function OrganizationsPage() {
                   <td className="px-5 py-4">
                     <StatusPill status={org.status} />
                   </td>
-                  <td className="px-5 py-4">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        className="rounded-md px-2.5 py-1.5 text-xs font-semibold text-ink hover:bg-cream"
-                        type="button"
-                        onClick={() => navigate(`/organizations/${org.id}`)}
-                      >
-                        Open
-                      </button>
-                      <button
-                        className="rounded-md px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
-                        type="button"
-                        disabled={busyId === org.id}
-                        onClick={() => void onDelete(org)}
-                      >
-                        Delete
-                      </button>
-                    </div>
+                  <td className="px-3 py-4">
+                    <button
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      type="button"
+                      aria-label={`Delete ${org.name}`}
+                      title="Delete"
+                      disabled={busyId === org.id}
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        void onDelete(org);
+                      }}
+                    >
+                      <TrashIcon />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -233,6 +240,25 @@ export function OrganizationsPage() {
           </table>
         )}
       </div>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete organization?"
+        body={
+          pendingDelete
+            ? `Delete “${pendingDelete.name}”? It will no longer appear in Admin, and its users will be disabled.`
+            : ""
+        }
+        confirmLabel="Delete"
+        danger
+        busy={Boolean(pendingDelete && busyId === pendingDelete.id)}
+        onCancel={() => {
+          if (!busyId) {
+            setPendingDelete(null);
+          }
+        }}
+        onConfirm={() => void confirmDelete()}
+      />
     </div>
   );
 }
@@ -256,5 +282,19 @@ function Chip({
     >
       {children}
     </button>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden>
+      <path
+        d="M5 7h14M10 11v6M14 11v6M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-9 0 1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

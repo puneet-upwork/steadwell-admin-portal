@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { rotateJoinToken, type Organization } from "./api";
 import { encodeQR } from "./qr";
+import { ConfirmDialog } from "./ui";
 
 export function JoinQrBlock({
   org,
@@ -15,17 +16,16 @@ export function JoinQrBlock({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [confirmRotate, setConfirmRotate] = useState(false);
   const enabled = (org.channels ?? []).filter((ch) => enabledBySlug[ch.slug]);
 
-  async function regenerate() {
-    if (!window.confirm("Regenerate join QR? The old channel links and QRs will stop assigning new users.")) {
-      return;
-    }
+  async function confirmRegenerate() {
     setBusy(true);
     setError("");
     try {
       const next = await rotateJoinToken(org.id);
       onUpdated?.(next);
+      setConfirmRotate(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Regenerate failed");
     } finally {
@@ -46,7 +46,7 @@ export function JoinQrBlock({
           className="rounded-lg border border-sand px-3 py-2 text-sm font-medium text-ink hover:bg-cream disabled:opacity-60"
           type="button"
           disabled={busy}
-          onClick={() => void regenerate()}
+          onClick={() => setConfirmRotate(true)}
         >
           {busy ? "Regenerating…" : "Regenerate token"}
         </button>
@@ -64,6 +64,21 @@ export function JoinQrBlock({
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmRotate}
+        title="Regenerate join token?"
+        body="The old channel links and QRs will stop assigning new users. Existing users are not moved."
+        confirmLabel="Regenerate"
+        danger
+        busy={busy}
+        onCancel={() => {
+          if (!busy) {
+            setConfirmRotate(false);
+          }
+        }}
+        onConfirm={() => void confirmRegenerate()}
+      />
     </div>
   );
 }

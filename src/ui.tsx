@@ -105,3 +105,74 @@ export function ToggleRow({
     </label>
   );
 }
+
+export function ConfirmDialog({
+  open,
+  title,
+  body,
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  danger = false,
+  busy = false,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  title: string;
+  body: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  danger?: boolean;
+  busy?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  if (!open) {
+    return null;
+  }
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="presentation">
+      <button
+        type="button"
+        className="absolute inset-0 bg-ink/40 backdrop-blur-[1px]"
+        aria-label="Dismiss"
+        disabled={busy}
+        onClick={onCancel}
+      />
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirm-dialog-title"
+        aria-describedby="confirm-dialog-body"
+        className="relative w-full max-w-md rounded-2xl border border-sand bg-cream-card p-6 shadow-lift"
+      >
+        <h2 id="confirm-dialog-title" className="font-display text-xl font-semibold tracking-tight text-ink">
+          {title}
+        </h2>
+        <p id="confirm-dialog-body" className="mt-2 text-sm leading-relaxed text-ink-muted">
+          {body}
+        </p>
+        <div className="mt-6 flex justify-end gap-2">
+          <button
+            type="button"
+            className="rounded-lg px-3 py-2 text-sm font-medium text-ink-muted hover:bg-cream disabled:opacity-60"
+            disabled={busy}
+            onClick={onCancel}
+          >
+            {cancelLabel}
+          </button>
+          <button
+            type="button"
+            className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 ${
+              danger ? "bg-red-700 hover:bg-red-800" : "bg-sage hover:bg-sage-hover"
+            }`}
+            disabled={busy}
+            onClick={onConfirm}
+          >
+            {busy ? "Working…" : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

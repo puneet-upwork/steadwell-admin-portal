@@ -12,6 +12,7 @@ import {
 import { JoinQrBlock } from "./JoinQrBlock";
 import {
   CATEGORIES,
+  ConfirmDialog,
   SEAT_BANDS,
   SUBCATEGORIES,
   ToggleRow,
@@ -34,6 +35,7 @@ export function OrganizationDetailPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (!id) {
@@ -103,7 +105,11 @@ export function OrganizationDetailPage() {
     if (!org) {
       return;
     }
-    if (!window.confirm(`Soft delete “${org.name}”?`)) {
+    setConfirmDelete(true);
+  }
+
+  async function confirmSoftDelete() {
+    if (!org) {
       return;
     }
     setBusy(true);
@@ -113,6 +119,7 @@ export function OrganizationDetailPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Delete failed");
       setBusy(false);
+      setConfirmDelete(false);
     }
   }
 
@@ -280,18 +287,30 @@ export function OrganizationDetailPage() {
 
       <div className="rounded-2xl border border-red-200 bg-red-50/40 p-6">
         <h2 className="text-sm font-semibold text-red-900">Danger zone</h2>
-        <p className="mt-1 text-sm text-red-800/80">
-          Soft delete sets status to disabled. The row stays in the database; users are not moved.
-        </p>
         <button
           className="mt-4 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60"
           type="button"
           disabled={busy}
           onClick={() => void onDelete()}
         >
-          Soft delete organization
+          Delete organization
         </button>
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete organization?"
+        body={`Delete “${org.name}”? It will no longer appear in Admin, and its users will be disabled.`}
+        confirmLabel="Delete"
+        danger
+        busy={busy}
+        onCancel={() => {
+          if (!busy) {
+            setConfirmDelete(false);
+          }
+        }}
+        onConfirm={() => void confirmSoftDelete()}
+      />
     </div>
   );
 }

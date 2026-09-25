@@ -1123,4 +1123,3 @@ export const _tests = {
 // const o3 = qr('test', 'gif');
 // const o4 = qr('test', 'svg');
 // const o5 = qr('test', 'term');
-//# sourceMappingURL=index.js.map
