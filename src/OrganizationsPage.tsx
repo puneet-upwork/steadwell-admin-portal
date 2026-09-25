@@ -1,14 +1,16 @@
 import { FormEvent, ReactNode, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { listOrganizations, softDeleteOrganization, type Organization } from "./api";
-import { CATEGORIES, ConfirmDialog, StatusPill, categoryLabel, seatBandLabel } from "./ui";
+import { CATEGORIES, ConfirmDialog, FloatingAlert, StatusPill, categoryLabel, seatBandLabel } from "./ui";
 
 export function OrganizationsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
   const [category, setCategory] = useState("");
@@ -48,6 +50,15 @@ export function OrganizationsPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const flash = (location.state as { flash?: string } | null)?.flash;
+    if (!flash) {
+      return;
+    }
+    setSuccess(flash);
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [location.pathname, location.state, navigate]);
 
   async function onSearch(e: FormEvent) {
     e.preventDefault();
@@ -100,6 +111,7 @@ export function OrganizationsPage() {
       await softDeleteOrganization(org.id);
       setPendingDelete(null);
       await refresh();
+      setSuccess("Organization deleted successfully");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Delete failed");
     } finally {
@@ -164,11 +176,8 @@ export function OrganizationsPage() {
         </div>
       </form>
 
-      {error ? (
-        <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
-          {error}
-        </p>
-      ) : null}
+      <FloatingAlert message={error} onDismiss={() => setError("")} />
+      <FloatingAlert message={success} tone="success" onDismiss={() => setSuccess("")} />
 
       <div className="mt-6 overflow-hidden rounded-2xl border border-sand bg-cream-card shadow-lift">
         {loading ? (

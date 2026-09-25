@@ -15,6 +15,22 @@ export type OrgChannel = {
   name: string;
   enabled: boolean;
   join_url?: string;
+  configured?: boolean;
+  bot_username?: string;
+  phone_number?: string;
+  liff_url?: string;
+};
+
+export type ChannelInput = {
+  enabled: boolean;
+  bot_username?: string;
+  bot_token?: string;
+  webhook_secret?: string;
+  phone_number?: string;
+  api_token?: string;
+  liff_url?: string;
+  channel_secret?: string;
+  channel_access_token?: string;
 };
 
 export type Organization = {
@@ -52,10 +68,13 @@ async function parse(res: Response): Promise<unknown> {
 }
 
 function errorMessage(data: unknown, fallback: string): string {
-  if (data && typeof data === "object" && "error" in data) {
-    const err = (data as { error?: unknown }).error;
-    if (typeof err === "string" && err) {
-      return err;
+  if (data && typeof data === "object") {
+    const rec = data as { error?: unknown; errors?: unknown };
+    if (Array.isArray(rec.errors) && rec.errors.length > 0) {
+      return rec.errors.filter((e) => typeof e === "string").join("; ") || fallback;
+    }
+    if (typeof rec.error === "string" && rec.error) {
+      return rec.error;
     }
   }
   return fallback;
@@ -152,7 +171,7 @@ export async function createOrganization(input: {
   subcategory?: string;
   seat_band?: string;
   features?: Record<string, boolean>;
-  channels?: Record<string, boolean>;
+  channels?: Record<string, ChannelInput>;
 }): Promise<Organization> {
   const res = await fetch("/admin/v1/organizations", {
     method: "POST",
@@ -210,7 +229,7 @@ export async function putOrganizationFeatures(
 
 export async function putOrganizationChannels(
   id: string,
-  channels: Record<string, boolean>,
+  channels: Record<string, ChannelInput>,
 ): Promise<Organization> {
   const res = await fetch(`/admin/v1/organizations/${id}/channels`, {
     method: "PUT",

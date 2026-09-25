@@ -9,10 +9,18 @@ import {
   updateOrganization,
   type Organization,
 } from "./api";
+import {
+  ChannelCredsFields,
+  channelPayload,
+  emptyChannelCreds,
+  validateChannelCreds,
+  type ChannelCreds,
+} from "./channelFields";
 import { JoinQrBlock } from "./JoinQrBlock";
 import {
   CATEGORIES,
   ConfirmDialog,
+  FloatingAlert,
   SEAT_BANDS,
   SUBCATEGORIES,
   ToggleRow,
@@ -31,7 +39,8 @@ export function OrganizationDetailPage() {
   const [subcategory, setSubcategory] = useState("");
   const [seatBand, setSeatBand] = useState("");
   const [features, setFeatures] = useState<Record<string, boolean>>({});
-  const [channels, setChannels] = useState<Record<string, boolean>>({});
+  const [channels, setChannels] = useState<Record<string, ChannelCreds>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -56,9 +65,15 @@ export function OrganizationDetailPage() {
           fmap[f.key] = f.enabled;
         }
         setFeatures(fmap);
-        const cmap: Record<string, boolean> = {};
+        const cmap: Record<string, ChannelCreds> = {};
         for (const ch of row.channels ?? []) {
-          cmap[ch.slug] = ch.enabled;
+          cmap[ch.slug] = {
+            ...emptyChannelCreds(ch.enabled),
+            configured: ch.configured,
+            bot_username: ch.bot_username ?? "",
+            phone_number: ch.phone_number ?? "",
+            liff_url: ch.liff_url ?? "",
+          };
         }
         setChannels(cmap);
       })
@@ -80,6 +95,20 @@ export function OrganizationDetailPage() {
     if (!org) {
       return;
     }
+    const nextErrors: Record<string, string[]> = {};
+    let hasErr = false;
+    for (const [slug, creds] of Object.entries(channels)) {
+      const errs = validateChannelCreds(slug, creds, true);
+      if (errs.length) {
+        nextErrors[slug] = errs;
+        hasErr = true;
+      }
+    }
+    setFieldErrors(nextErrors);
+    if (hasErr) {
+      setError("Fill required bot credentials for each enabled channel.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -91,11 +120,15 @@ export function OrganizationDetailPage() {
         subcategory,
         seat_band: seatBand,
       });
-      await putOrganizationChannels(org.id, channels);
-      const next = await putOrganizationFeatures(org.id, features);
-      setOrg(next);
+      const payload: Record<string, ReturnType<typeof channelPayload>> = {};
+      for (const [slug, creds] of Object.entries(channels)) {
+        payload[slug] = channelPayload(creds);
+      }
+      await putOrganizationChannels(org.id, payload);
+      await putOrganizationFeatures(org.id, features);
+      navigate("/organizations", { replace: true, state: { flash: "Organization updated successfully" } });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : "Could not update the organization");
     } finally {
       setBusy(false);
     }
@@ -115,7 +148,7 @@ export function OrganizationDetailPage() {
     setBusy(true);
     try {
       await softDeleteOrganization(org.id);
-      navigate("/organizations", { replace: true });
+      navigate("/organizations", { replace: true, state: { flash: "Organization deleted successfully" } });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Delete failed");
       setBusy(false);
@@ -153,9 +186,7 @@ export function OrganizationDetailPage() {
         <p className="mt-1 text-sm text-ink-muted">{org.user_count.toLocaleString()} users</p>
       </div>
 
-      {error ? (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
-      ) : null}
+      <FloatingAlert message={error} onDismiss={() => setError("")} />
 
       <form className="space-y-8" onSubmit={(e) => void onSave(e)}>
         <div className="rounded-2xl border border-sand bg-cream-card p-6 shadow-lift">
@@ -235,12 +266,14 @@ export function OrganizationDetailPage() {
           <h2 className="font-display text-xl font-semibold tracking-tight">Channels</h2>
           <div className="mt-4 space-y-3">
             {(org.channels ?? []).map((ch) => (
-              <ToggleRow
+              <ChannelCredsFields
                 key={ch.slug}
-                label={ch.name}
-                description={`Enable ${ch.name} for this org’s join QR`}
-                on={channels[ch.slug] ?? false}
-                onToggle={() => setChannels((prev) => ({ ...prev, [ch.slug]: !prev[ch.slug] }))}
+                slug={ch.slug}
+                name={ch.name}
+                value={channels[ch.slug] ?? emptyChannelCreds(ch.enabled)}
+                isEdit
+                errors={fieldErrors[ch.slug] ?? []}
+                onChange={(next) => setChannels((prev) => ({ ...prev, [ch.slug]: next }))}
               />
             ))}
           </div>
@@ -248,14 +281,23 @@ export function OrganizationDetailPage() {
 
         <JoinQrBlock
           org={org}
-          enabledBySlug={channels}
+          channelsBySlug={channels}
           onUpdated={(next) => {
             setOrg(next);
-            const cmap: Record<string, boolean> = {};
-            for (const ch of next.channels ?? []) {
-              cmap[ch.slug] = channels[ch.slug] ?? ch.enabled;
-            }
-            setChannels(cmap);
+            setChannels((prev) => {
+              const cmap: Record<string, ChannelCreds> = { ...prev };
+              for (const ch of next.channels ?? []) {
+                cmap[ch.slug] = {
+                  ...(cmap[ch.slug] ?? emptyChannelCreds(ch.enabled)),
+                  configured: ch.configured,
+                  bot_username: ch.bot_username ?? cmap[ch.slug]?.bot_username ?? "",
+                  phone_number: ch.phone_number ?? cmap[ch.slug]?.phone_number ?? "",
+                  liff_url: ch.liff_url ?? cmap[ch.slug]?.liff_url ?? "",
+                  enabled: cmap[ch.slug]?.enabled ?? ch.enabled,
+                };
+              }
+              return cmap;
+            });
           }}
         />
 

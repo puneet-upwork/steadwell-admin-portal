@@ -1,3 +1,79 @@
+import { useEffect, useRef } from "react";
+
+export function FloatingAlert({
+  message,
+  tone = "error",
+  offsetSidebar = true,
+  onDismiss,
+}: {
+  message: string;
+  tone?: "error" | "success";
+  offsetSidebar?: boolean;
+  onDismiss: () => void;
+}) {
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
+  useEffect(() => {
+    if (!message) {
+      return;
+    }
+    const id = window.setTimeout(() => onDismissRef.current(), 6000);
+    return () => window.clearTimeout(id);
+  }, [message]);
+  if (!message) {
+    return null;
+  }
+  const success = tone === "success";
+  return (
+    <div
+      className={`fixed bottom-6 z-[60] flex w-[min(22rem,calc(100vw-2rem))] items-start gap-3 rounded-2xl px-4 py-3.5 text-white shadow-lg ${
+        success ? "bg-[#22c55e]" : "bg-[#f87171]"
+      } ${offsetSidebar ? "left-[calc(15.5rem+2rem)]" : "left-6"}`}
+      role="status"
+    >
+      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-white">
+        {success ? <CheckIcon /> : <ErrorIcon />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[15px] font-semibold leading-tight">{success ? "Success" : "Error"}</p>
+        <p className="mt-0.5 text-sm leading-snug text-white/95">{message}</p>
+      </div>
+      <button
+        type="button"
+        className="shrink-0 rounded-md p-0.5 text-white/90 hover:bg-white/15"
+        aria-label="Dismiss"
+        onClick={onDismiss}
+      >
+        <CloseIcon />
+      </button>
+    </div>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden>
+      <path d="M3.5 8.2 6.4 11 12.5 4.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ErrorIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden>
+      <path d="M4 8h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" aria-hidden>
+      <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function StatusPill({ status }: { status: string }) {
   const tone =
     status === "active"

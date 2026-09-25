@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import { login, me } from "./api";
 import { BrandMark } from "./BrandMark";
+import { FloatingAlert } from "./ui";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -36,6 +37,8 @@ export function LoginPage() {
   }
 
   return (
+    <>
+    <FloatingAlert message={error} tone="error" offsetSidebar={false} onDismiss={() => setError("")} />
     <div className="min-h-screen lg:grid lg:grid-cols-2">
       <aside className="relative hidden overflow-hidden bg-ink px-12 py-12 text-cream lg:flex lg:flex-col lg:justify-between">
         <div
@@ -88,11 +91,6 @@ export function LoginPage() {
                   required
                 />
               </label>
-              {error ? (
-                <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
-                  {error}
-                </p>
-              ) : null}
               <button className="btn-primary" type="submit" disabled={busy}>
                 {busy ? "Signing in…" : "Sign in"}
               </button>
@@ -101,5 +99,6 @@ export function LoginPage() {
         </div>
       </main>
     </div>
+    </>
   );
 }

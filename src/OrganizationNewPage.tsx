@@ -9,7 +9,15 @@ import {
   type FeatureDefinition,
 } from "./api";
 import {
+  ChannelCredsFields,
+  channelPayload,
+  emptyChannelCreds,
+  validateChannelCreds,
+  type ChannelCreds,
+} from "./channelFields";
+import {
   CATEGORIES,
+  FloatingAlert,
   SEAT_BANDS,
   SUBCATEGORIES,
   ToggleRow,
@@ -27,7 +35,10 @@ export function OrganizationNewPage() {
   const [defs, setDefs] = useState<FeatureDefinition[]>([]);
   const [channelDefs, setChannelDefs] = useState<ChannelDefinition[]>([]);
   const [features, setFeatures] = useState<Record<string, boolean>>({ text_messages: true });
-  const [channels, setChannels] = useState<Record<string, boolean>>({ telegram: true });
+  const [channels, setChannels] = useState<Record<string, ChannelCreds>>({
+    telegram: emptyChannelCreds(false),
+  });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -49,7 +60,7 @@ export function OrganizationNewPage() {
           const next = { ...prev };
           for (const row of chanRows) {
             if (next[row.slug] === undefined) {
-              next[row.slug] = row.slug === "telegram";
+              next[row.slug] = emptyChannelCreds(false);
             }
           }
           return next;
@@ -66,10 +77,28 @@ export function OrganizationNewPage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    const nextErrors: Record<string, string[]> = {};
+    let hasErr = false;
+    for (const [slug, creds] of Object.entries(channels)) {
+      const errs = validateChannelCreds(slug, creds, false);
+      if (errs.length) {
+        nextErrors[slug] = errs;
+        hasErr = true;
+      }
+    }
+    setFieldErrors(nextErrors);
+    if (hasErr) {
+      setError("Fill required bot credentials for each enabled channel.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
-      const org = await createOrganization({
+      const payload: Record<string, ReturnType<typeof channelPayload>> = {};
+      for (const [slug, creds] of Object.entries(channels)) {
+        payload[slug] = channelPayload(creds);
+      }
+      await createOrganization({
         name,
         legal_name: legalName || undefined,
         status,
@@ -77,9 +106,9 @@ export function OrganizationNewPage() {
         subcategory: subcategory || undefined,
         seat_band: seatBand || undefined,
         features,
-        channels,
+        channels: payload,
       });
-      navigate(`/organizations/${org.id}`, { replace: true });
+      navigate("/organizations", { replace: true, state: { flash: "Organization created successfully" } });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Create failed");
     } finally {
@@ -97,9 +126,7 @@ export function OrganizationNewPage() {
       <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight">New organization</h1>
       <p className="mt-1 text-sm text-ink-muted">Slug is generated from the name. Join QR is created on save.</p>
 
-      {error ? (
-        <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
-      ) : null}
+      <FloatingAlert message={error} onDismiss={() => setError("")} />
 
       <form className="mt-8 space-y-10" onSubmit={(e) => void onSubmit(e)}>
         <section>
@@ -188,12 +215,14 @@ export function OrganizationNewPage() {
               <p className="text-sm text-ink-muted">Loading channels…</p>
             ) : (
               channelDefs.map((ch) => (
-                <ToggleRow
+                <ChannelCredsFields
                   key={ch.slug}
-                  label={ch.name}
-                  description={`Enable ${ch.name} for this org’s join QR`}
-                  on={channels[ch.slug] ?? false}
-                  onToggle={() => setChannels((prev) => ({ ...prev, [ch.slug]: !prev[ch.slug] }))}
+                  slug={ch.slug}
+                  name={ch.name}
+                  value={channels[ch.slug] ?? emptyChannelCreds(false)}
+                  isEdit={false}
+                  errors={fieldErrors[ch.slug] ?? []}
+                  onChange={(next) => setChannels((prev) => ({ ...prev, [ch.slug]: next }))}
                 />
               ))
             )}
